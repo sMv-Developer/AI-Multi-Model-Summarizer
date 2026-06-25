@@ -19,17 +19,13 @@ function App() {
   const [activeInput, setActiveInput] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Track active poll intervals across rendering frames
   const pollIntervalRef = useRef(null);
-  // Track the active state during async operations to prevent race conditions
   const activeInputRef = useRef(activeInput);
 
-  // Keep the ref synchronized with the state changes
   useEffect(() => {
     activeInputRef.current = activeInput;
   }, [activeInput]);
 
-  // Clean up any hanging polling timers to prevent memory leaks
   const clearPolling = () => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
@@ -38,7 +34,7 @@ function App() {
   };
 
   useEffect(() => {
-    return () => clearPolling(); // Cleanup on unmount
+    return () => clearPolling();
   }, []);
 
   const getWordCount = (str) => {
@@ -80,7 +76,6 @@ function App() {
 
       pollIntervalRef.current = setInterval(async () => {
         try {
-          // Check if user cleared inputs mid-poll sequence
           if (!activeInputRef.current) {
             clearPolling();
             return;
@@ -95,7 +90,11 @@ function App() {
           }
         } catch (pollError) {
           console.error('Error checking job status:', pollError);
-          setErrorMessage('Error verifying updates from summary engine.');
+          if (pollError.response?.status === 429) {
+            setErrorMessage(pollError.response.data?.error || 'Too many requests. Summary checking throttled.');
+          } else {
+            setErrorMessage('Error verifying updates from summary engine.');
+          }
           setIsProcessing(false);
           clearPolling();
         }
@@ -103,7 +102,11 @@ function App() {
 
     } catch (error) {
       console.error('Error generating summary:', error);
-      setErrorMessage('Failed to generate summary. Please try again.');
+      if (error.response?.status === 429) {
+        setErrorMessage(error.response.data?.error || 'Too many text requests, please try again later.');
+      } else {
+        setErrorMessage('Failed to generate summary. Please try again.');
+      }
       setIsProcessing(false);
       clearPolling();
     }
@@ -137,7 +140,6 @@ function App() {
             return;
         }
 
-        // RACE CONDITION FIX: Ensure user didn't hit 'Clear' while file was extracting
         if (!activeInputRef.current || files.length === 0) {
           setIsProcessing(false);
           return;
@@ -148,15 +150,19 @@ function App() {
         } else {
           setErrorMessage('Could not extract legible text content from the provided file.');
           setIsProcessing(false);
-          setFiles([]);         // Drop failing file out of state
-          setActiveInput(null); // Unlock layout options
+          setFiles([]);
+          setActiveInput(null);
         }
       } catch (error) {
         console.error('Extraction error:', error);
-        setErrorMessage('An error occurred during file parsing and processing.');
+        if (error.response?.status === 429) {
+          setErrorMessage(error.response.data?.error || 'Heavy file processing limit reached. Please wait before uploading more files.');
+        } else {
+          setErrorMessage('An error occurred during file parsing and processing.');
+        }
         setIsProcessing(false);
-        setFiles([]);         // Drop failing file out of state
-        setActiveInput(null); // Unlock layout options
+        setFiles([]);
+        setActiveInput(null);
       }
     }
   };
@@ -178,7 +184,6 @@ function App() {
   const handleTextChange = useCallback((newText) => {
     if (files.length > 0) return;
     setText(newText);
-    // Explicit length lock prevents blank spaces bypassing input routing restrictions
     setActiveInput(newText.length > 0 ? 'text' : null);
   }, [files]);
 
@@ -187,11 +192,9 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 antialiased selection:bg-cyan-500/20">
-
       <main className="flex-grow container mx-auto max-w-5xl px-6 py-12 space-y-10">
-        
-        {/* Dynamic Conversational Greeting & Project Overview Header */}
-        <motion.div 
+
+        <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-3 max-w-2xl mx-auto"
@@ -215,10 +218,9 @@ function App() {
         )}
 
         <div className="grid gap-8 md:grid-cols-2">
-          {/* Option 1: File Card */}
           <div className={`group relative bg-slate-50 p-6 rounded-2xl border transition-all duration-300 ${isFileInputDisabled
-              ? 'opacity-40 border-slate-200 bg-slate-100'
-              : 'border-slate-300 shadow-md hover:border-teal-600 hover:shadow-lg'
+            ? 'opacity-40 border-slate-200 bg-slate-100'
+            : 'border-slate-300 shadow-md hover:border-teal-600 hover:shadow-lg'
             }`}>
             <h2 className="text-lg font-bold tracking-wide text-teal-700 mb-4 flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-teal-600" />
@@ -230,10 +232,9 @@ function App() {
             </div>
           </div>
 
-          {/* Option 2: Text Card */}
           <div className={`group relative bg-slate-50 p-6 rounded-2xl border transition-all duration-300 ${isTextInputDisabled
-              ? 'opacity-40 border-slate-200 bg-slate-100'
-              : 'border-slate-300 shadow-md hover:border-cyan-600 hover:shadow-lg'
+            ? 'opacity-40 border-slate-200 bg-slate-100'
+            : 'border-slate-300 shadow-md hover:border-cyan-600 hover:shadow-lg'
             }`}>
             <h2 className="text-lg font-bold tracking-wide text-cyan-700 mb-4 flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-cyan-600" />
@@ -243,7 +244,6 @@ function App() {
           </div>
         </div>
 
-        {/* Action Center */}
         {activeInput && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -268,12 +268,10 @@ function App() {
           </motion.div>
         )}
 
-        {/* Results Window */}
         <div className="pt-4">
           <SummaryResult summary={summary} />
         </div>
       </main>
-
     </div>
   );
 }
