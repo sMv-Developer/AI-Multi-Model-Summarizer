@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL }));
 app.use(express.json());
-
+app.set("trust proxy", 1);
 // API Endpoints Mapping
 app.use("/api/summarize", textRoutes);
 app.use("/api/extract", mediaRoutes);
