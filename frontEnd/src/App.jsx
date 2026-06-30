@@ -23,6 +23,14 @@ function App() {
   const activeInputRef = useRef(activeInput);
 
   useEffect(() => {
+  const backendUrl =  import.meta.env.VITE_API_URL;
+  if (backendUrl) {
+    fetch(`${backendUrl}`)
+      .then(() => console.log("Wake-up ping sent!"))
+      .catch((err) => console.warn("Initialization ping failed:", err));
+   }
+ }, []);
+  useEffect(() => {
     activeInputRef.current = activeInput;
   }, [activeInput]);
 
